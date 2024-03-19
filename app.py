@@ -34,15 +34,15 @@ def generate_response(prompt):
     chatbot = hugchat.ChatBot(cookie_path="cookies.json")
     response = chatbot.chat(prompt)
     return response
-
-## Conditional display of AI generated responses as a function of user provided prompts
+# Conditional display of AI generated responses as a function of user provided prompts
 with response_container:
     if user_input:
         response = generate_response(user_input)
         st.session_state.user_input.append(user_input)
-        st.session_state.bot_response.append(response)
+        st.session_state.bot_response.append(response["content"]) # Save only the text content of the message
         
     if st.session_state['bot_response']:
         for i in range(len(st.session_state['bot_response'])):
             message(st.session_state['user_input'][i], is_user=True, key=str(i) + '_user')
-            message(st.session_state['bot_response'][i], key=str(i))
+            msg = message(st.session_state['bot_response'][i], key=str(i))
+            msg.markdown(f'<p style="white-space: pre-wrap;">{st.session_state["bot_response"][i]}</p>', unsafe_allow_html=True)
