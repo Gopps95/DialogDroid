@@ -1,6 +1,6 @@
 import streamlit as st
  
-st.title("DialogDroid")
+st.title("Dialogroid")
 st.write("Your new virtual assistant")
 name = st.text_input(label="",placeholder="Enter your name", max_chars=50)
 if st.button('Submit'):
