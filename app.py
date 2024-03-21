@@ -1,87 +1,75 @@
+import wget
 import streamlit as st
-from hugchat import hugchat
+from llama_index import (
+    SimpleDirectoryReader,
+    VectorStoreIndex,
+    ServiceContext,
+)
+from llama_index.llms import LlamaCPP
+from llama_index.llms.llama_utils import (
+    messages_to_prompt,
+    completion_to_prompt,
+)
+from langchain.schema import(SystemMessage, HumanMessage, AIMessage)
 
-streamlit_style = """
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;1,100&display=swap');
+def bar_custom(current, total, width=80):
+    print("Downloading %d%% [%d / %d] bytes" % (current / total * 100, current, total))
 
-        .hotel-bold {
-            font-weight: 600;
-        }
+model_url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf"
+wget.download(model_url, bar=bar_custom)
 
-        .hotel-font {
-            font-size: 20px;
-            background-color: #e6f9ff;
-        }
+def init_page():
+    st.set_page_config(
+        page_title="Personal Chatbot"
+    )
+    st.header("Personal Chatbot")
+    st.sidebar.title("Options")
 
-        label.css-1p2iens.effi0qh3{
-            font-size: 18px;
-        }
+def select_llm():
+    return LlamaCPP(
+        model_path="llama-2-7b-chat.Q2_K.gguf",
+        temperature=0.1,
+        max_new_tokens=500,
+        context_window=3900,
+        generate_kwargs={},
+        model_kwargs={"n_gpu_layers":1},
+        messages_to_prompt=messages_to_prompt,
+        completion_to_prompt=completion_to_prompt,
+        verbose=True,
+    )
 
-        p{
-            font-size: 18px;
-        }
-        li{
-            font-size: 18px;
-        }		
-        #MainMenu{
-            visibility: hidden;
-        }	  
-        button.css-135zi6y.edgvbvh9{
-            font-size: 18px;
-            font-weight: 600;
-        }
+def init_messages():
+    clear_button = st.sidebar.button("Clear Conversation", key="clear")
+    if clear_button or "messages" not in st.session_state:
+        st.session_state.messages = [
+            SystemMessage(
+                content="you are a helpful AI assistant. Reply your answer in markdown format."
+            )
+        ]
 
-        /* Add this CSS to position the input container at the bottom */
-        .input-container {
-            position: fixed;
-            bottom: 20px;
-            left: 0;
-            right: 0;
-            padding: 10px;
-            background-color: white;
-            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
-        }
-    </style>
-"""
+def get_answer(llm, messages):
+    response = llm.complete(messages)
+    return response.text
 
-st.set_page_config(page_title="DialogDroid")
+def main():
+    init_page()
+    llm = select_llm()
+    init_messages()
 
+    if user_input := st.text_input("Input your question!"):
+        st.session_state.messages.append(HumanMessage(content=user_input))
+        with st.spinner("Bot is typing ..."):
+            answer = get_answer(llm, user_input)
+        st.session_state.messages.append(AIMessage(content=answer))
 
-if 'bot_response' not in st.session_state:
-    st.session_state['bot_response'] = ["I'm Sunny kuttan, How may I help you?"]
+    messages = st.session_state.get("messages", [])
+    for message in messages:
+        if isinstance(message, AIMessage):
+            with st.beta_container():
+                st.markdown(message.content)
+        elif isinstance(message, HumanMessage):
+            with st.beta_container():
+                st.markdown(message.content)
 
-if 'user_input' not in st.session_state:
-    st.session_state['user_input'] = ['Hi!']
-
-def get_input():
-    input_text = st.text_input("You: ", "", key="input")
-    return input_text
-
-def generate_response(prompt):
-    chatbot = hugchat.ChatBot(cookie_path="cookies.json")
-    response = chatbot.chat(prompt)
-    return response
-
-# Create a container for the chat history
-chat_container = st.container()
-
-# Create a container for the text input box
-input_container = st.container()
-
-# Render the chat history
-with chat_container:
-    for i in range(len(st.session_state['user_input'])):
-        st.write(f"User: {st.session_state['user_input'][i]}")
-        st.write(f"DialogDroid: {st.session_state['bot_response'][i]}")
-
-# Render the text input box
-with input_container:
-    user_input = get_input()
-    if user_input:
-        response = generate_response(user_input)
-        st.session_state.user_input.append(user_input)
-        st.session_state.bot_response.append(response)
-
-# Add the custom CSS
-st.markdown(streamlit_style, unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
